@@ -10,46 +10,73 @@ struct node{
     struct node *next;
 };
 
-
 void destruct(struct node *p)
 {
     struct node *q;
     while(p != NULL){
         q = p->next;
-        free(p->data);
+        /* free(p->data);  old version. 1st stage. */
         free(p);
         p = q;
     }
 }
 
-/**
-* TODO: debug memory leak
-*/
+void free_array(char ** a)
+{
+	char *p;
+	for(p = *a; p != NULL; p++){
+		free(p);
+	}
+	free(a);
+}
+
+char ** list2array(struct node *list, long int n)
+{
+	char ** a = (char **) malloc (sizeof(char *) * (n+1));
+	struct node *p;
+	long int i;
+	
+	for(i = 0, p = list; i < n; i++, p = p->next){
+		a[i] = p->data;
+	}
+	a[n] = NULL;
+	
+	return a;
+}
+
+
 int main(int argc, const char * const * argv){
     struct node *list = NULL, *word;
     char *buffer;
-    bool eof_err = false, space_as_letter = false;
     long int buffer_size, buffer_actual_size;
-    long int last_quotes, pos;
+    char **args;
+    long int args_number;
+    bool eof_err = false, space_as_letter = false;
+    long int last_quotes_position, position;
     int ch;
 
     const char *hello = "root@8.8.8.8:~# ";
     const long int DEFAULT_BUFFER_LENGTH = 64;
 
     while(!eof_err){
-        pos = 0;
+		/* initiate for new input */
+        position = 0;
         space_as_letter = false;
         word = (struct node*) malloc (sizeof(*word)); /* head word */
         word->data = NULL;
         word->next = NULL;
         list = word;
+        
+        args_number = 0;
+        args = NULL;
         buffer_actual_size = 0;
         buffer_size = DEFAULT_BUFFER_LENGTH;
         buffer = (char*) malloc (sizeof(char) * buffer_size);
 
         printf("%s", hello);
+        /* get string and build structure */
         do{
-            ++pos;
+            ++position;
             ch = getchar();
             if(ch == EOF){
                 eof_err = true;
@@ -57,7 +84,7 @@ int main(int argc, const char * const * argv){
 
             if(ch == '"'){
                 space_as_letter ^= true;
-                last_quotes = pos;
+                last_quotes_position = position;
             } else
             if((ch == ' ' && !space_as_letter) || ch == EOF || ch == '\n'){
                 /* drop buffer to structure if not empty */
@@ -72,6 +99,7 @@ int main(int argc, const char * const * argv){
                     word = word->next;
                     word->next = NULL;
                     
+                    args_number++;
                     buffer_actual_size = 0;
                 }
             } else {
@@ -93,21 +121,31 @@ int main(int argc, const char * const * argv){
                 buffer[buffer_actual_size++] = ch;
             }
         } while(ch != '\n' && !eof_err);
-        /* take structure to the screen */
+        free(buffer);
+        
+        /* 2nd step: convert list to array */
+        args = list2array(list, args_number);
+        destruct(list);
+        
+        /* take structure to the stream */
         if(eof_err){
             /* we need to add one '\n' because there are no '\n''s in the string */
             putchar('\n');
         }
         if(!space_as_letter){
-            for(word = list; word != NULL && word->data != NULL; word = word->next){
-                printf("%s\n", word->data);
+			char * arg;
+			int i;
+            for(arg = *args, i = 0; i < args_number && arg != NULL; arg++, i++){
+                printf("%s\n", arg);
             }
         } else {
-            printf("Missed quotes at position %ld\n", last_quotes);
+            printf("Unmatched quotes at position %ld\n", last_quotes_position);
         }
+        
+        
         /* free memory */
-        destruct(list);
-        free(buffer);
+        free_array(args);
+        
     }
     
     printf("[exit]\n");
