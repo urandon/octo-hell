@@ -25,7 +25,8 @@ void destruct(struct node *p)
 /**
 * TODO: debug memory leak
 */
-int main(int argc, const char * const * argv){
+int main(int argc, const char * const * argv)
+{
     struct node *list = NULL, *word;
     char *buffer;
     bool eof_err = false, space_as_letter = false;
