@@ -294,13 +294,13 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
 /**
  * TODO:	1) '&' background support
  * 			2) '|' convayor support
- * 			3) IO redirrection	
  */
 int main(int argc, const char * const * argv){
 	struct exec_node * chain, *node;
 	char ** args;
     long bad_quotes_pos;
     int status, bg_run;
+    int zombie;
 
     const char *hello = "root@8.8.8.8:~# ";
 
@@ -321,7 +321,6 @@ int main(int argc, const char * const * argv){
 		if(status & DUPLICATE_STDOUT)
 			printf("Duplicate standart output\n");
 		
-		fprintf(stderr, "status = %x\tstatus & ~EOF_ERROR = %x\n", status, status & ~EOF_ERROR);
         if((status & ~EOF_ERROR) == 0) { /* no parses errors */
 			/* simple execution, add features later */
 	        if(bg_run)
@@ -332,33 +331,37 @@ int main(int argc, const char * const * argv){
 					/* everything is OK */
 					/* simple version */
 					int pid = fork();
-					if(node->input != NULL){
-						fclose(stdin);
-						if(open(node->input, O_RDONLY) == -1){
-							fprintf(stderr, "[%s] Bad input stream: %s", args[0], strerror(errno));
-							exit(1);
-						}
-					}
-					if(node->output != NULL){
-						fclose(stdout);
-						if(open(node->output, O_CREAT|O_WRONLY|O_TRUNC) == -1){
-							fprintf(stderr, "[%s] Bad output stream: %s", args[0], strerror(errno));
-							exit(1);
-						}
-					}
-					
-					
 					if(pid == 0){
+						/* redirrect IO if needed */
+						if(node->input != NULL){
+							fclose(stdin);
+							if(open(node->input, O_RDONLY) == -1){
+								fprintf(stderr, "[%s] Bad input stream: %s", args[0], strerror(errno));
+								exit(1);
+							}
+						}
+						if(node->output != NULL){
+							fclose(stdout);
+							if(open(node->output, O_CREAT|O_WRONLY|O_TRUNC) == -1){
+								fprintf(stderr, "[%s] Bad output stream: %s", args[0], strerror(errno));
+								exit(1);
+							}
+						}
 						execvp(args[0], args);
 						perror(args[0]);
-						exit(1);
+						exit(1);						
 					} else {
-						printf("PID [%d] started\n", pid);
-						waitpid(pid, NULL, 0);
-						printf("PID [%d] finished\n", pid);
+						printf("%s (PID %d) started\n", args[0], pid);
+						if(!bg_run){
+							waitpid(pid, NULL, 0);
+							printf("%s (PID %d) finished\n", args[0], pid);
+						}
 					}
 				}
 			}
+			//while(zombie = wait(WNOHANG) != -1){
+			//	printf("%s (PID %d) finished\n", args[0], zombie);
+			//}
 		}
         /* free memory */
         destruct_chain(chain);
