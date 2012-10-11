@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <errno.h>
+#include <string.h>
 
 #define bool char
 #define true 1
@@ -332,15 +333,15 @@ int main(int argc, const char * const * argv){
 					/* simple version */
 					int pid = fork();
 					if(node->input != NULL){
-						close(stdin);
+						fclose(stdin);
 						if(open(node->input, O_RDONLY) == -1){
 							fprintf(stderr, "[%s] Bad input stream: %s", args[0], strerror(errno));
 							exit(1);
 						}
 					}
 					if(node->output != NULL){
-						close(stdout);
-						if(open(node->output) == -1){
+						fclose(stdout);
+						if(open(node->output, O_CREAT|O_WRONLY|O_TRUNC) == -1){
 							fprintf(stderr, "[%s] Bad output stream: %s", args[0], strerror(errno));
 							exit(1);
 						}
