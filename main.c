@@ -3,7 +3,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <ctype.h>
+#include <errno.h>
 
 #define bool char
 #define true 1
@@ -98,9 +101,6 @@ void print_chain(struct exec_node *chain){
 	printf("~end\n");
 }
 
-/**
- * TODO: IO redirrection detector
- */
 
 struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quotes)
 {
@@ -159,7 +159,6 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
 		  || ch == EOF || ch == '\n'){
             /* drop buffer to structure if not empty */
             if(buffer_actual_size != 0){
-				count++;
                 long int i;
                 string = (char*) malloc((buffer_actual_size + 1) * sizeof(char));
                 for(i = 0; i < buffer_actual_size; i++){
@@ -175,6 +174,7 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
 						
 						word = word->next;
 						word->next = NULL;
+						count++;
 						break;
 					case STDIN:
 						if(node->input != NULL){
@@ -245,11 +245,16 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
 			destruct_words(list);
 
 			/* push 'args' into chain */
-			prev_node = node;
 			node->args = args;
-			node->next = (struct exec_node*) malloc(sizeof(*node));
-			node = node->next;
-			node->next = NULL;
+			
+			if(ch == '|'){
+				prev_node = node;
+				node->next = (struct exec_node*) malloc(sizeof(*node));				
+				node = node->next;
+				node->next = NULL;
+				node->input = NULL;
+				node->output = NULL;
+			}
 
 			word = (struct words*) malloc (sizeof(*word)); /* head word */
 			word->data = NULL;
@@ -262,10 +267,7 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
 
     /* free memory */
     free(buffer);
-	/* delete unuseful node */
-	free(node);
-	prev_node->next = NULL;
-	/* check if the chain is empty */
+	/* check if the the string was empty */
 	if(chain->args[0] == NULL && chain->next == NULL){
 		destruct_chain(chain);
 		chain = NULL;
@@ -289,10 +291,9 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
 }
 
 /**
- * TODO:	1) update main() function to exec_node using
- * 			2) '&' background support
- * 			3) '|' convayor support
- * 			4) IO redirrection	
+ * TODO:	1) '&' background support
+ * 			2) '|' convayor support
+ * 			3) IO redirrection	
  */
 int main(int argc, const char * const * argv){
 	struct exec_node * chain, *node;
@@ -321,7 +322,7 @@ int main(int argc, const char * const * argv){
 		
 		fprintf(stderr, "status = %x\tstatus & ~EOF_ERROR = %x\n", status, status & ~EOF_ERROR);
         if((status & ~EOF_ERROR) == 0) { /* no parses errors */
-			/* simple execution */
+			/* simple execution, add features later */
 	        if(bg_run)
 				printf("Runnig in backround\n");
 			for(node = chain; node != NULL; node = node->next){
@@ -330,6 +331,21 @@ int main(int argc, const char * const * argv){
 					/* everything is OK */
 					/* simple version */
 					int pid = fork();
+					if(node->input != NULL){
+						close(stdin);
+						if(open(node->input, O_RDONLY) == -1){
+							fprintf(stderr, "[%s] Bad input stream: %s", args[0], strerror(errno));
+							exit(1);
+						}
+					}
+					if(node->output != NULL){
+						close(stdout);
+						if(open(node->output) == -1){
+							fprintf(stderr, "[%s] Bad output stream: %s", args[0], strerror(errno));
+							exit(1);
+						}
+					}
+					
 					
 					if(pid == 0){
 						execvp(args[0], args);
