@@ -37,6 +37,15 @@ struct words{
     struct words *next;
 };
 
+int cmpstr(const char *a, const char *b)
+{
+	while((*a == *b) && (*a != '\0')){
+		++a;
+		++b;
+	}
+	return *a == *b;
+}
+
 void free_array(char** args)
 {
 	char** str;
@@ -103,7 +112,7 @@ void print_chain(struct exec_node *chain){
 }
 
 
-struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quotes)
+struct exec_node * parse_string(int * bg_run, int * err_status)
 {
 	struct exec_node *chain, *node, *prev_node = NULL;
 	char** args;
@@ -114,7 +123,6 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
     char *buffer = (char*) malloc (sizeof(char) * DEFAULT_BUFFER_SIZE);
     long int buffer_size = DEFAULT_BUFFER_SIZE, buffer_actual_size = 0;
     int quotes_on = false;
-    long int last_quotes, pos = 0;
     enum dirrection{
 		ARGUMENTS,
 		STDIN,
@@ -140,7 +148,6 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
     count = 0;
 
     do{
-        ++pos;
         ch = getchar();
         if(ch == EOF){
             *err_status |= EOF_ERROR;
@@ -154,7 +161,6 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
 
         if(ch == '"'){
             quotes_on ^= true;
-            last_quotes = pos;
         } else
         if((!quotes_on && (isspace(ch) || ch == '&' || ch == '|' || ch == '<' || ch == '>'))
 		  || ch == EOF || ch == '\n'){
@@ -282,7 +288,6 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
 	}
     
     /* quote error */
-    *bad_quotes = (quotes_on) ? last_quotes : 0;
 	*err_status |= (quotes_on) ? BAD_QUOTES : 0;
     
     args = convert_words2array(list, count);
@@ -291,80 +296,176 @@ struct exec_node * parse_string(int * bg_run, int * err_status, long * bad_quote
     return chain;
 }
 
+/* 0 - no cd
+ * 1 - correct cd (one argument and no convayer)
+ * 2 - there is cd, but not enough #args (zero)
+ * 3 - there is cd, but #args more than one
+ * 4 - there is cd, but convayer found
+ *  */
+int look4cd(struct exec_node *chain)
+{
+	struct exec_node *node;
+	char ** args;
+	int cd_here = 0, cd_args = 0;
+	
+	if(chain == NULL){
+		return 0;
+	}
+	
+	for(node = chain; node != NULL && !cd_here; node = node->next){
+		if(node->args != NULL){
+			cd_here = cmpstr(node->args[0], "cd");
+			if(cd_here == 1){
+				args = node->args;
+				if(args[1] == NULL){
+					cd_args = 0;
+				} else
+				if(args[2] == NULL) {
+					cd_args = 1;
+				} else {
+					cd_args = 2;
+				}
+			}
+		}
+	}
+	
+	if(cd_here){
+		if(node != chain->next || node != NULL){
+			/* convayor found */
+			return 4;
+		}
+		switch(cd_args){
+			case 0: return 2; break;
+			case 1: return 1; break;
+			case 2: return 3; break;
+		}
+	}
+	
+	return 0;	
+}
+
+int say_if_error(int status)
+{
+    if(status & BAD_QUOTES)
+        printf("Missed quotes\n");
+    if(status & BAD_AMPERSAND)
+		printf("Wrong ampersand was found\n");
+	if(status & BAD_CONVEYOR)
+		printf("The conveyor cannot be created: not enough commands to execute\n");
+	if(status & DUPLICATE_STDIN)
+		printf("Duplicate standart input\n");
+	if(status & DUPLICATE_STDOUT)
+		printf("Duplicate standart output\n");
+	
+	return status & ~EOF_ERROR;
+}
+
+void launch_chain(struct exec_node * chain, int bg_run)
+{
+	struct exec_node *node;
+	char **args;
+
+	for(node = chain; node != NULL; node = node->next){
+		args = node->args;
+		if(*args != NULL) {
+			/* everything is OK */
+			/* simple version */
+			int pid = fork();
+			if(pid == 0){
+				/* redirrect IO if needed */
+				if(node->input != NULL){
+					fclose(stdin);
+					if(open(node->input, O_RDONLY) == -1){
+						fprintf(stderr, "[%s] Bad input stream: %s", args[0], strerror(errno));
+						exit(1);
+					}
+				}
+				if(node->output != NULL){
+					fclose(stdout);
+					if(open(node->output, O_CREAT|O_WRONLY|O_TRUNC) == -1){
+						fprintf(stderr, "[%s] Bad output stream: %s", args[0], strerror(errno));
+						exit(1);
+					}
+				}
+				execvp(args[0], args);
+				perror(args[0]);
+				exit(1);						
+			} else {
+				/* printf("%s (PID %d) started\n", args[0], pid); */
+				if(!bg_run){
+					waitpid(pid, NULL, 0);
+					/* printf("%s (PID %d) finished\n", args[0], pid); */
+				} else {
+					printf("%s [PID %d] start\n", args[0], pid);
+				}
+			}
+		}
+	}
+}
+
+void change_dirrectory(const char * path){
+	if(path == NULL){
+		fprintf(stderr, "cd: path not specefied (null got)\n");
+	} else
+	if(chdir(path) != 0){
+		perror("cd");
+	}	
+}
+
+int get_n_execute(const char * home)
+{
+	struct exec_node * chain;
+    int status, bg_run;
+
+    chain = parse_string(&bg_run, &status);
+    print_chain(chain);
+
+    if(say_if_error(status) == 0) {
+		switch(look4cd(chain)){
+			case 0:
+				launch_chain(chain, bg_run);
+				break;
+			case 1:
+				change_dirrectory(chain->args[1]);
+				break;
+			case 2:
+				change_dirrectory(home);
+				break;
+			case 3:
+				fprintf(stderr, "cd: Too much arguments\n");
+				break;
+			case 4:
+				fprintf(stderr, "cd: Cannot be user in convayor\n");
+				break;
+			default:
+				break;
+		}
+	}
+    /* free memory */
+    destruct_chain(chain);
+    
+    return status;
+}
+
 /**
- * TODO:	1) '&' background support
- * 			2) '|' convayor support
+ * TODO: '|' convayor support
  */
 int main(int argc, const char * const * argv){
-	struct exec_node * chain, *node;
-	char ** args;
-    long bad_quotes_pos;
-    int status, bg_run;
+    int status = 0;
     int zombie;
+    char *home;
+    
+    home = getenv("HOME");
 
     const char *hello = "root@8.8.8.8:~# ";
 
     while(! (status & EOF_ERROR)){
         printf("%s", hello);
-        chain = parse_string(&bg_run, &status, &bad_quotes_pos);
-        args = (chain!=NULL) ? chain->args : (char**)NULL; /*simple*/
-        print_chain(chain);
-        
-        if(status & BAD_QUOTES)
-            printf("Missed quotes at position %ld\n", bad_quotes_pos);
-        if(status & BAD_AMPERSAND)
-			printf("Wrong ampersand was found\n");
-		if(status & BAD_CONVEYOR)
-			printf("The conveyor cannot be created: not enough commands to execute\n");
-		if(status & DUPLICATE_STDIN)
-			printf("Duplicate standart input\n");
-		if(status & DUPLICATE_STDOUT)
-			printf("Duplicate standart output\n");
-		
-        if((status & ~EOF_ERROR) == 0) { /* no parses errors */
-			/* simple execution, add features later */
-	        if(bg_run)
-				printf("Runnig in backround\n");
-			for(node = chain; node != NULL; node = node->next){
-				args = node->args;
-				if(*args != NULL) {
-					/* everything is OK */
-					/* simple version */
-					int pid = fork();
-					if(pid == 0){
-						/* redirrect IO if needed */
-						if(node->input != NULL){
-							fclose(stdin);
-							if(open(node->input, O_RDONLY) == -1){
-								fprintf(stderr, "[%s] Bad input stream: %s", args[0], strerror(errno));
-								exit(1);
-							}
-						}
-						if(node->output != NULL){
-							fclose(stdout);
-							if(open(node->output, O_CREAT|O_WRONLY|O_TRUNC) == -1){
-								fprintf(stderr, "[%s] Bad output stream: %s", args[0], strerror(errno));
-								exit(1);
-							}
-						}
-						execvp(args[0], args);
-						perror(args[0]);
-						exit(1);						
-					} else {
-						printf("%s (PID %d) started\n", args[0], pid);
-						if(!bg_run){
-							waitpid(pid, NULL, 0);
-							printf("%s (PID %d) finished\n", args[0], pid);
-						}
-					}
-				}
-			}
-			//while(zombie = wait(WNOHANG) != -1){
-			//	printf("%s (PID %d) finished\n", args[0], zombie);
-			//}
+        status = get_n_execute(home);
+
+		while((zombie = waitpid(-1, NULL, WNOHANG)) != -1 && zombie != 0){
+			printf("[PID %d] finished\n", zombie);
 		}
-        /* free memory */
-        destruct_chain(chain);
     }
     
     printf("[logout]\n");
