@@ -4,36 +4,37 @@
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
 !_TAG_PROGRAM_VERSION	5.8	//
-BAD_AMPERSAND	main.c	/^    BAD_AMPERSAND   = 4,$/;"	e	enum:error_status	file:
-BAD_CONVEYOR	main.c	/^    BAD_CONVEYOR    = 8,$/;"	e	enum:error_status	file:
-BAD_QUOTES	main.c	/^    BAD_QUOTES      = 2,$/;"	e	enum:error_status	file:
-DBG	main.c	16;"	d	file:
-DUPLICATE_STDIN	main.c	/^    DUPLICATE_STDIN = 16,$/;"	e	enum:error_status	file:
-DUPLICATE_STDOUT	main.c	/^    DUPLICATE_STDOUT= 32,$/;"	e	enum:error_status	file:
-EOF_ERROR	main.c	/^    EOF_ERROR       = 1,$/;"	e	enum:error_status	file:
-UNKNOWN_ERROR	main.c	/^    UNKNOWN_ERROR   = 64,$/;"	e	enum:error_status	file:
-args	main.c	/^    char **args; \/* execution arguments *\/$/;"	m	struct:exec_node	file:
-bool	main.c	12;"	d	file:
+BAD_AMPERSAND	parser.h	/^    BAD_AMPERSAND   = 4,$/;"	e	enum:error_status
+BAD_CONVEYOR	parser.h	/^    BAD_CONVEYOR    = 8,$/;"	e	enum:error_status
+BAD_QUOTES	parser.h	/^    BAD_QUOTES      = 2,$/;"	e	enum:error_status
+DBG	main.c	12;"	d	file:
+DUPLICATE_STDIN	parser.h	/^    DUPLICATE_STDIN = 16,$/;"	e	enum:error_status
+DUPLICATE_STDOUT	parser.h	/^    DUPLICATE_STDOUT= 32,$/;"	e	enum:error_status
+EOF_ERROR	parser.h	/^    EOF_ERROR       = 1,$/;"	e	enum:error_status
+RARSER_H	parser.h	2;"	d
+UNKNOWN_ERROR	parser.h	/^    UNKNOWN_ERROR   = 64,$/;"	e	enum:error_status
+args	parser.h	/^    char **args; \/* execution arguments *\/$/;"	m	struct:exec_node
+bool	parser.c	6;"	d	file:
 change_dirrectory	main.c	/^void change_dirrectory(const char * path){$/;"	f
 cmpstr	main.c	/^int cmpstr(const char *a, const char *b)$/;"	f
-convert_words2array	main.c	/^char** convert_words2array(struct words * list, long n)$/;"	f
-data	main.c	/^    char *data;$/;"	m	struct:words	file:
+convert_words2array	parser.c	/^char** convert_words2array(struct words * list, long n)$/;"	f
+data	parser.c	/^    char *data;$/;"	m	struct:words	file:
 destruct_chain	main.c	/^void destruct_chain(struct exec_node *p)$/;"	f
-destruct_words	main.c	/^void destruct_words(struct words *p)$/;"	f
-error_status	main.c	/^enum error_status {$/;"	g	file:
-exec_node	main.c	/^struct exec_node{$/;"	s	file:
-false	main.c	14;"	d	file:
-free_array	main.c	/^void free_array(char** args)$/;"	f
+destruct_words	parser.c	/^void destruct_words(struct words *p)$/;"	f
+error_status	parser.h	/^enum error_status{$/;"	g
+exec_node	parser.h	/^struct exec_node{$/;"	s
+false	parser.c	8;"	d	file:
+free_array	parser.c	/^void free_array(char** args)$/;"	f
 get_n_execute	main.c	/^int get_n_execute(const char * home)$/;"	f
-input	main.c	/^    char *input, *output;$/;"	m	struct:exec_node	file:
+input	parser.h	/^    char *input, *output;$/;"	m	struct:exec_node
 launch_chain	main.c	/^void launch_chain(struct exec_node * chain, int bg_run)$/;"	f
 look4cd	main.c	/^int look4cd(struct exec_node *chain)$/;"	f
 main	main.c	/^int main(int argc, const char * const * argv){$/;"	f
-next	main.c	/^    struct exec_node *next;$/;"	m	struct:exec_node	typeref:struct:exec_node::exec_node	file:
-next	main.c	/^    struct words *next;$/;"	m	struct:words	typeref:struct:words::words	file:
-output	main.c	/^    char *input, *output;$/;"	m	struct:exec_node	file:
-parse_string	main.c	/^struct exec_node * parse_string(int * bg_run, int * err_status)$/;"	f
+next	parser.c	/^    struct words *next;$/;"	m	struct:words	typeref:struct:words::words	file:
+next	parser.h	/^    struct exec_node *next;$/;"	m	struct:exec_node	typeref:struct:exec_node::exec_node
+output	parser.h	/^    char *input, *output;$/;"	m	struct:exec_node
+parse_string	parser.c	/^struct exec_node * parse_string(int * bg_run, int * err_status)$/;"	f
 print_chain	main.c	/^void print_chain(struct exec_node *chain){$/;"	f
 say_if_error	main.c	/^int say_if_error(int status)$/;"	f
-true	main.c	13;"	d	file:
-words	main.c	/^struct words{$/;"	s	file:
+true	parser.c	7;"	d	file:
+words	parser.c	/^struct words{$/;"	s	file:
