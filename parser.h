@@ -17,6 +17,7 @@ struct exec_node{
     struct exec_node *next;
 };
 
+void destruct_chain(struct exec_node *p);
 struct exec_node * parse_string(int * bg_run, int * err_status);
 
 #endif

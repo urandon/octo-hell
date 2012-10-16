@@ -31,6 +31,19 @@ void destruct_words(struct words *p)
     }
 }
 
+void destruct_chain(struct exec_node *p)
+{
+    struct exec_node *q;
+    while(p != NULL){
+        q = p->next;
+        free_array(p->args);
+        free(p->input);
+        free(p->output);
+        free(p);
+        p = q;
+    }
+}
+
 char** convert_words2array(struct words * list, long n)
 {
     char ** a = (char **) malloc (sizeof(char *) * (n+1));
