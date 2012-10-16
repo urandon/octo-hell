@@ -150,7 +150,7 @@ void launch_chain(struct exec_node * chain, int bg_run) /* runned in forked proc
 					}
 					close(newfd);
 				} else {
-					fprintf(stderr, "%s: input redirrection ingorring, convayor found", args[0]);
+					fprintf(stderr, "%s: input redirrection ingorring, convayor found\n", args[0]);
 				}
 			}
 			/* output */
@@ -163,7 +163,7 @@ void launch_chain(struct exec_node * chain, int bg_run) /* runned in forked proc
 					}
 					close(newfd);
 				} else {
-					fprintf(stderr, "%s: output redirrection ingorring, convayor found", args[0]);
+					fprintf(stderr, "%s: output redirrection ingorring, convayor found\n", args[0]);
 				}
 			}
 			/* execution */
