@@ -100,12 +100,9 @@ int say_if_error(int status)
 	if(status & DUPLICATE_STDOUT)
 		printf("Duplicate standart output\n");
 	
-	return status & ~EOF_ERROR;
+	return status;
 }
 
-/**
- * TODO: '|' convayor support
- */
 void launch_chain(struct exec_node * chain, int bg_run) /* runned in forked process */
 {
 	struct exec_node *node = chain;
@@ -127,13 +124,15 @@ void launch_chain(struct exec_node * chain, int bg_run) /* runned in forked proc
 			}
 			if(pid == 0){
 				/* children */
-				close(pipefd[1]);
 				dup2(pipefd[0], STDIN_FILENO);
+				close(pipefd[0]);
+				close(pipefd[1]);
 				node = node->next;
 			} else {
 				/* parent */
-				close(pipefd[0]);
 				dup2(pipefd[1], STDOUT_FILENO);
+				close(pipefd[0]);
+				close(pipefd[1]);
 			}
 		}
 		if(pid != 0 || node->next == NULL){
@@ -192,7 +191,7 @@ int get_n_execute(const char * home)
 	pid_t pid;
 
 	chain = parse_string(&bg_run, &status);
-	print_chain(chain);
+	/* print_chain(chain); */
 
 	if(say_if_error(status) == 0) {
 		switch(look4cd(chain)){
@@ -244,7 +243,7 @@ int main(int argc, const char * const * argv){
 		}
 	}
 	
-	printf("[logout]\n");
+	printf("\n[logout]\n");
 
 	return 0;
 }
