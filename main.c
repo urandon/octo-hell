@@ -177,7 +177,7 @@ void launch_chain(struct exec_node * chain, int bg_run) /* runned in forked proc
 
 void change_dirrectory(const char * path){
 	if(path == NULL){
-		fprintf(stderr, "cd: path not specefied (null got)\n");
+		fprintf(stderr, "cd: path not specified (null got)\n");
 	} else
 	if(chdir(path) != 0){
 		perror("cd");
@@ -210,7 +210,7 @@ int get_n_execute(const char * home)
 				change_dirrectory(home);
 				break;
 			case 3:
-				fprintf(stderr, "cd: Too much arguments\n");
+				fprintf(stderr, "cd: too much arguments\n");
 				break;
 			case 4:
 				fprintf(stderr, "cd: Cannot be user in convayor\n");
