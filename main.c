@@ -121,7 +121,8 @@ int free_pid_list(struct pid_list * list)
 	return cnt;
 }
 
-void delete(struct pid_list **list, int pid)
+/* returns #of pid if it is not here, -1 instead */
+int delete(struct pid_list **list, int pid)
 {
 	struct pid_list * node = (*list), * prev = NULL;
 	
@@ -143,7 +144,11 @@ void delete(struct pid_list **list, int pid)
 			free(prev->next);
 			prev->next = node;
 		}
+	} else {
+		return pid;
 	}
+	
+	return -1;
 }
 
 /* returns when all the threads exited*/
@@ -249,7 +254,7 @@ int get_n_execute(const char * home)
 	struct exec_node * chain;
 	struct pid_list * list;
 	int status, bg_run;
-	pid_t pid;
+	pid_t pid, zombie;
 
 	chain = parse_string(&bg_run, &status);
 	/* print_chain(chain); */
@@ -261,7 +266,10 @@ int get_n_execute(const char * home)
 				if(bg_run == 0){
 					while(list != NULL){
 						pid = wait(NULL);
-						delete(&list, pid);
+						zombie = delete(&list, pid);
+						if(zombie != -1){
+							printf("[PID %d] finished\n", zombie);
+						}
 					}
 				}
 				free_pid_list(list);
