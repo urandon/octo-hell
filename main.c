@@ -103,20 +103,35 @@ int say_if_error(int status)
 	return status;
 }
 
-/**
- * TODO: sync all threads
- * create container process
- */
+struct pid_list{
+	int pid;
+	struct pid_list * next;
+};
 
-void launch_chain_sync(struct exec_node * chain, int bg_run) /* runned in forked process */
+int free_pid_list(struct pid_list * list)
+{
+	int cnt = 0;
+	struct pid_list * node = list;
+	while(node != NULL){
+		node = list->next;
+		free(list);
+		list = node;
+		cnt++;
+	}
+	return cnt;
+}
+
+/* returns when all the threads exited*/
+struct pid_list * launch_chain_sync(struct exec_node * chain, int bg_run)
 {
 	struct exec_node *node = chain;
 	char **args;
 	int *pipefd_new, *pipefd_old, *t_swap;
+	struct pid_list * list = NULL, * tmp;
 	pid_t pid = -1;
 	
 	if(node == NULL){
-		exit(1);
+		return list;
 	}
 	
 	pipefd_new = (int *) malloc (2 * sizeof(int));
@@ -176,21 +191,29 @@ void launch_chain_sync(struct exec_node * chain, int bg_run) /* runned in forked
 			exit(1);
 		} else {
 			/* controller */
-			close(pipefd_old[0]);
-			close(pipefd_old[1]);
+			if(node != chain){
+				close(pipefd_old[0]);
+				close(pipefd_old[1]);
+			}
 			/* swap */
 			t_swap = pipefd_old;
 			pipefd_old = pipefd_new;
 			pipefd_new = t_swap;
+			/* pid_list */
+			tmp = (struct pid_list *) malloc (sizeof(tmp));
+			tmp->next = list;
+			tmp->pid = pid;
+			list = tmp;
 		}
 	}
 	
 	/* wait for all the zombies*/
 	while(wait(NULL) != -1);;
 	
-	exit(1);
+	return list;
 }
 
+/* returns when the first finishes*/
 void launch_chain(struct exec_node * chain, int bg_run) /* runned in forked process */
 {
 	struct exec_node *node = chain;
@@ -275,6 +298,7 @@ void change_dirrectory(const char * path){
 int get_n_execute(const char * home)
 {
 	struct exec_node * chain;
+	struct pid_list * list;
 	int status, bg_run;
 	pid_t pid;
 
@@ -284,12 +308,14 @@ int get_n_execute(const char * home)
 	if(say_if_error(status) == 0) {
 		switch(look4cd(chain)){
 			case 0:
-				if((pid = fork()) == 0){
-					launch_chain_sync(chain, bg_run);
-				} else
-				if(bg_run == 0){					
-					waitpid(pid, NULL, 0);
+				list = launch_chain_sync(chain, bg_run);
+				if(bg_run == 0){
+					struct pid_list * node;
+					for(node = list; node != NULL; node = node->next){
+						waitpid(node->pid, NULL, 0);
+					}
 				}
+				free_pid_list(list);
 				break;
 			case 1:
 				change_dirrectory(chain->args[1]);
