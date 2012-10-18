@@ -103,6 +103,94 @@ int say_if_error(int status)
 	return status;
 }
 
+/**
+ * TODO: sync all threads
+ * create container process
+ */
+
+void launch_chain_sync(struct exec_node * chain, int bg_run) /* runned in forked process */
+{
+	struct exec_node *node = chain;
+	char **args;
+	int *pipefd_new, *pipefd_old, *t_swap;
+	pid_t pid = -1;
+	
+	if(node == NULL){
+		exit(1);
+	}
+	
+	pipefd_new = (int *) malloc (2 * sizeof(int));
+	pipefd_old = (int *) malloc (2 * sizeof(int));
+	
+	for(node = chain; node != NULL; node = node->next){
+		pipe(pipefd_new);
+		pid = fork();
+		if(pid == 0){
+			/* children */
+			args = node->args;
+			if(args == NULL){
+				fprintf(stderr, "Cannot execute empty command\n");
+				exit(1);
+			}
+			/* set up convayor IO streams */
+			if(node != chain){ /* change input on non-first */
+				dup2(pipefd_old[0], STDIN_FILENO);
+				close(pipefd_old[0]);
+				close(pipefd_old[1]);
+			}
+			if(node->next != NULL){ /* change output on non-last */
+				dup2(pipefd_new[1], STDOUT_FILENO);
+				close(pipefd_new[0]);
+				close(pipefd_new[1]);
+			}
+			/* set up file IO redirrection */
+			/* input */
+			if(node->input != NULL){
+				if(node == chain){
+					int newfd = open(node->input, O_RDONLY);
+					if(newfd == -1 || (newfd != -1 && (dup2(newfd, STDIN_FILENO) == -1))){
+						fprintf(stderr, "%s: bad input stream: %s\n", args[0], strerror(errno));
+						exit(1);
+					}
+					close(newfd);
+				} else {
+					fprintf(stderr, "%s: input redirrection ingorring, convayor found\n", args[0]);
+				}
+			}
+			/* output */
+			if(node->output != NULL){
+				if(node->next == NULL){
+					int newfd = open(node->output, O_CREAT|O_WRONLY|O_TRUNC, 0666);
+					if(newfd == -1 || (newfd != -1 && (dup2(newfd, STDOUT_FILENO) == -1))){
+						fprintf(stderr, "%s: bad output stream: %s\n", args[0], strerror(errno));
+						exit(1);
+					}
+					close(newfd);
+				} else {
+					fprintf(stderr, "%s: output redirrection ingorring, convayor found\n", args[0]);
+				}
+			}
+			/* execution */
+			execvp(args[0], args);
+			perror(args[0]);
+			exit(1);
+		} else {
+			/* controller */
+			close(pipefd_old[0]);
+			close(pipefd_old[1]);
+			/* swap */
+			t_swap = pipefd_old;
+			pipefd_old = pipefd_new;
+			pipefd_new = t_swap;
+		}
+	}
+	
+	/* wait for all the zombies*/
+	while(wait(NULL) != -1);;
+	
+	exit(1);
+}
+
 void launch_chain(struct exec_node * chain, int bg_run) /* runned in forked process */
 {
 	struct exec_node *node = chain;
@@ -197,7 +285,7 @@ int get_n_execute(const char * home)
 		switch(look4cd(chain)){
 			case 0:
 				if((pid = fork()) == 0){
-					launch_chain(chain, bg_run);
+					launch_chain_sync(chain, bg_run);
 				} else
 				if(bg_run == 0){					
 					waitpid(pid, NULL, 0);
