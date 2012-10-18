@@ -121,8 +121,33 @@ int free_pid_list(struct pid_list * list)
 	return cnt;
 }
 
+void delete(struct pid_list **list, int pid)
+{
+	struct pid_list * node = (*list), * prev = NULL;
+	
+	while(node != NULL){
+		if(node->pid == pid){
+			break;
+		}
+		prev = node;
+		node = node->next;
+	}
+	
+	if(node != NULL){
+		if(prev == NULL){ /* => node == list => we need change "list" var */
+			node = (*list)->next;
+			free(*list);
+			*list = node;
+		} else {
+			node = node->next;
+			free(prev->next);
+			prev->next = node;
+		}
+	}
+}
+
 /* returns when all the threads exited*/
-struct pid_list * launch_chain_sync(struct exec_node * chain, int bg_run)
+struct pid_list * launch_chain_sync(struct exec_node * chain)
 {
 	struct exec_node *node = chain;
 	char **args;
@@ -207,83 +232,7 @@ struct pid_list * launch_chain_sync(struct exec_node * chain, int bg_run)
 		}
 	}
 	
-	/* wait for all the zombies*/
-	while(wait(NULL) != -1);;
-	
 	return list;
-}
-
-/* returns when the first finishes*/
-void launch_chain(struct exec_node * chain, int bg_run) /* runned in forked process */
-{
-	struct exec_node *node = chain;
-	char **args;
-	int pipefd[2];
-	pid_t pid = -1;
-
-	while(node != NULL){
-		if(node->args == NULL){
-			fprintf(stderr, "Cannot execute empty command\n");
-			exit(1);
-		}
-		if(node->next != NULL){
-			pipe(pipefd);
-			pid = fork();
-			if(pid == -1){
-				perror("fork");
-				exit(1);
-			}
-			if(pid == 0){
-				/* children */
-				dup2(pipefd[0], STDIN_FILENO);
-				close(pipefd[0]);
-				close(pipefd[1]);
-				node = node->next;
-			} else {
-				/* parent */
-				dup2(pipefd[1], STDOUT_FILENO);
-				close(pipefd[0]);
-				close(pipefd[1]);
-			}
-		}
-		if(pid != 0 || node->next == NULL){
-			/* parent or the last */
-			/* check for IO redirrection */
-			args = node->args;
-			/* input */
-			if(node->input != NULL){
-				if(node == chain){
-					int newfd = open(node->input, O_RDONLY);
-					if(newfd == -1 || (newfd != -1 && (dup2(newfd, STDIN_FILENO) == -1))){
-						fprintf(stderr, "%s: bad input stream: %s\n", args[0], strerror(errno));
-						exit(1);
-					}
-					close(newfd);
-				} else {
-					fprintf(stderr, "%s: input redirrection ingorring, convayor found\n", args[0]);
-				}
-			}
-			/* output */
-			if(node->output != NULL){
-				if(node->next == NULL){
-					int newfd = open(node->output, O_CREAT|O_WRONLY|O_TRUNC, 0666);
-					if(newfd == -1 || (newfd != -1 && (dup2(newfd, STDOUT_FILENO) == -1))){
-						fprintf(stderr, "%s: bad output stream: %s\n", args[0], strerror(errno));
-						exit(1);
-					}
-					close(newfd);
-				} else {
-					fprintf(stderr, "%s: output redirrection ingorring, convayor found\n", args[0]);
-				}
-			}
-			/* execution */
-			execvp(args[0], args);
-			perror(args[0]);
-			exit(1);
-		}
-	}		
-	
-	exit(1);
 }
 
 void change_dirrectory(const char * path){
@@ -308,11 +257,11 @@ int get_n_execute(const char * home)
 	if(say_if_error(status) == 0) {
 		switch(look4cd(chain)){
 			case 0:
-				list = launch_chain_sync(chain, bg_run);
+				list = launch_chain_sync(chain);
 				if(bg_run == 0){
-					struct pid_list * node;
-					for(node = list; node != NULL; node = node->next){
-						waitpid(node->pid, NULL, 0);
+					while(list != NULL){
+						pid = wait(NULL);
+						delete(&list, pid);
 					}
 				}
 				free_pid_list(list);
